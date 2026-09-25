@@ -1087,6 +1087,7 @@ cc_defaults {
         "src/drivers/driver_common.c",
         "src/drivers/driver_nl80211.c",
         "src/drivers/driver_nl80211_android.c",
+        "src/drivers/driver_nl80211_mtk.c",
         "src/drivers/driver_nl80211_capa.c",
         "src/drivers/driver_nl80211_event.c",
         "src/drivers/driver_nl80211_monitor.c",
