@@ -14,6 +14,7 @@
 
 #include "common.h"
 #include "driver_nl80211.h"
+#include "linux_ioctl.h"
 
 /*
  * The physical-device wpa_supplicant build sets wpa_supplicant_use_stub_lib
@@ -77,10 +78,40 @@ int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
 				  size_t buf_len)
 {
 	struct i802_bss *bss = (struct i802_bss *)priv;
+	u8 macaddr[ETH_ALEN] = {};
+	int ret;
 
 	if (cmd == NULL) {
 		errno = EINVAL;
 		return -1;
+	}
+
+	/* ISupplicantStaIface.getMacAddress() asks the driver for "MACADDR"
+	 * and parses the reply as "Macaddr = XX:XX:XX:XX:XX:XX". Only the
+	 * brcm and intel backends answer that command; here it fell through
+	 * to the SETSUSPENDMODE-only gate below, so every connection attempt
+	 * made configureRandomizedMacAddress() throw ServiceSpecificException
+	 * and fall back to an unmanaged MAC. Read the hardware address off
+	 * the interface instead - what the intel path does via nl80211, but
+	 * without needing a driver command or an associated BSS. */
+	if (os_strcasecmp(cmd, "MACADDR") == 0) {
+		if (bss == NULL || bss->drv == NULL ||
+		    bss->drv->global == NULL) {
+			errno = EINVAL;
+			return -1;
+		}
+
+		ret = linux_get_ifhwaddr(bss->drv->global->ioctl_sock,
+					 bss->ifname, macaddr);
+		if (ret != 0) {
+			errno = EINVAL;
+			return -1;
+		}
+
+		if (buf != NULL && buf_len > 0)
+			os_snprintf(buf, buf_len, "Macaddr = " MACSTR "\n",
+				    MAC2STR(macaddr));
+		return 0;
 	}
 
 	/* The framework sends: SETSUSPENDMODE 1 or SETSUSPENDMODE 0. */
